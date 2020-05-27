@@ -30,6 +30,7 @@ def generate_sbm_adj(n, pi_vector, theta_in, theta_out):
 
 
 def generate_wsbm_adj(n, pi_vector, theta_in=3, theta_out=-3):
+    #toDo : check sum to 1
     c = generate_clusters(n, pi_vector)
     Adj = np.zeros((n, n))
     for i in range(n - 1):
@@ -42,6 +43,22 @@ def generate_wsbm_adj(n, pi_vector, theta_in=3, theta_out=-3):
                 Adj[j, i] = Adj[i, j]
     np.fill_diagonal(Adj, 1)
     return Adj
+
+def wsbm_built_in_block(n,pi_vector,wAdj,n_blocks,enh_params):
+    c=generate_clusters(n,pi_vector)
+    for k in range(len(n_blocks)):
+        idx_list=[i for i in range(len(c)) if int(c[i]+1)==n_blocks[k]]
+        borders=np.random.randint(idx_list[0],idx_list[-1],2)
+        wAdj[min(borders):max(borders),min(borders):max(borders)]=wAdj[min(borders):max(borders),min(borders):max(borders)]*enh_params[k]
+    return wAdj
+
+def wsbm_crossed_blocks(n,pi_vectors,theta_ins,theta_outs):
+    wAdj_mixed=np.zeros((n,n))
+    for i in range(len(pi_vectors)):
+        wAdj=generate_wsbm_adj(n,pi_vectors[i],theta_ins[i],theta_outs[i])
+        wAdj_mixed+=wAdj
+    np.fill_diagonal(wAdj_mixed,1)
+    return wAdj_mixed
 
 
 def random_permute(matrix):
