@@ -10,6 +10,7 @@ class TDAembedding:
         self.num_nodes = num_nodes
         self.h0embedding = []
         self.h1embedding = []
+        self.cycles = []
 
     def read_intervals(self, h0=False, h1=True):
         # sorted list
@@ -44,7 +45,7 @@ class TDAembedding:
                     res = read_h1(line)
                     if res is not None:
                         intervals['h1'].append(res)
-            intervals['h1'] = sorted(intervals['h1'])
+            intervals['h1'] = sorted(intervals['h1'],  key = lambda x: (x[0][0], x[0][1]))
             intervals['h0'] = sorted(intervals['h0'])
 
         return intervals
@@ -55,11 +56,12 @@ class TDAembedding:
         """
         if intervals is None:
             intervals = self.read_intervals(h0=False, h1=True)
-        cycle_vec, columns = create_cycle_mapping(intervals['h1'], self.num_nodes)
+        cycle_vec, columns,cycles = create_cycle_mapping(intervals['h1'], self.num_nodes)
         df = pd.DataFrame((cycle_vec > 0).astype('int'), columns=columns)
         df['num_ints'] = np.sum(cycle_vec>0, axis=1)
         df['mean_int'] = np.mean(cycle_vec, axis=1)
         self.h1embedding = df
+        self.cycles = cycles
         return df
 
     def create_h0_embedding(self, intervals = None):
@@ -70,6 +72,19 @@ class TDAembedding:
         if intervals is None:
             intervals = self.read_intervals(h0=True, h1=False)
         conn_vec, columns = create_conn_mapping(intervals['h0'], self.num_nodes)
+
+        df = pd.DataFrame(conn_vec, columns=columns)
+        self.h0embedding = df
+        return df
+
+    def create_h0_embedding_num_comps(self, intervals = None):
+        """
+
+        :return:
+        """
+        if intervals is None:
+            intervals = self.read_intervals(h0=True, h1=False)
+        conn_vec, columns = create_conn_mapping_old(intervals['h0'], self.num_nodes)
         conn_emb = np.zeros_like(conn_vec)
         for i in range(len(intervals['h0'])):
             for j in range(self.num_nodes):
@@ -93,13 +108,33 @@ def create_cycle_mapping(intervals, num_nodes = 20):
     """
     cycle_vec = np.zeros((num_nodes, len(intervals)))
     columns = []
+    cycles = []
     for idx, interval in enumerate(intervals):
-        cycle_vec[interval[1], idx] = interval[0][1] - interval[0][0]
-        columns.append(f"{interval[0][0] :.2f}-{interval[0][1] :.2f}")
-    return cycle_vec, columns
+        cycle_len = interval[0][1] - interval[0][0]
+        cycles.append((interval[0][1], cycle_len))
+        cycle_vec[interval[1], idx] = cycle_len
+        columns.append(f"{interval[0][0] :.3f}-{interval[0][1] :.3f}, {cycle_len :.3f}")
+    return cycle_vec, columns, cycles
 
 
 def create_conn_mapping(intervals, num_nodes = 20):
+    """
+
+    :param intervals: intervals['h1] in format (start,end), [cycle members]
+    :param num_nodes: number of nodes in network
+    :return:
+    """
+    conn_vec = np.zeros((num_nodes, len(intervals))).astype('int')
+    columns = []
+    for idx, interval in enumerate(intervals):
+
+        conn_vec[interval[1], idx] = 1
+        columns.append(f"{interval[0] :.3f}")
+    return conn_vec, columns
+
+
+
+def create_conn_mapping_old(intervals, num_nodes = 20):
     """
 
     :param intervals: intervals['h1] in format (start,end), [cycle members]
@@ -153,12 +188,13 @@ if __name__ == "__main__":
     res = read_h0(line)
     #line = "Dimension: 1"
     #h1line = read_h1(line)
-    filepath = 'ints_20_0.4_0.3_0.3_3-1.txt'
-    embd = TDAembedding(filepath)
+    filepath = 'ints/ints_20_mixed.txt'
+    embd = TDAembedding(filepath, num_nodes=50)
     #embd.create_h1_embedding()
-    df = embd.create_h0_embedding()
-    intervals = embd.read_intervals(h0=True, h1=False)
-    conn_vec, columns = create_conn_mapping(intervals['h0'], num_nodes=20)
+    intervals = embd.read_intervals(h0=True, h1=True)
+    df0 = embd.create_h0_embedding(intervals=intervals)
+    df1 = embd.create_h1_embedding(intervals=intervals)
+    #conn_vec, columns = create_conn_mapping(intervals['h0'], num_nodes=20)
 
     #cycle_vec, columns = create_cycle_mapping(intervals['h1'], num_nodes=20)
    # (cycle_vec > 0).astype('int')
